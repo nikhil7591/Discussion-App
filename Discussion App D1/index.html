@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discussion Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .discussion-container {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 2rem;
+            height: calc(100vh - 80px);
+        }
+        .left-pane, .right-pane {
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+        }
+        .left-pane {
+            background-color: #f9fafb;
+            border-right: 1px solid #e5e7eb;
+            overflow-y: auto;
+        }
+        .right-pane {
+             background-color: #ffffff;
+        }
+        .question-card {
+            cursor: pointer;
+            padding: 1rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            transition: box-shadow 0.2s;
+        }
+        .question-card:hover, .question-card.active {
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            border-left: 4px solid #3b82f6;
+        }
+        .response-card {
+            background-color: #f9fafb;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            border: 1px solid #e5e7eb;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <!-- Header -->
+    <header class="bg-teal-600 text-white shadow-md">
+        <div class="container mx-auto px-6 py-4">
+            <h1 class="text-2xl font-bold">Discussion Portal</h1>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-6 py-8">
+        <div class="discussion-container">
+            <!-- Left Pane: Questions List -->
+            <div id="left-pane" class="left-pane">
+                <div class="flex justify-between items-center mb-4">
+                    <button id="new-question-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300" style="margin-right: 20px;">New Question Form</button>
+                    <input type="text" id="search-input" placeholder="Search questions..." class="w-1/2 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div id="questions-list">
+                    <!-- Questions will be dynamically added here -->
+                </div>
+            </div>
+
+            <!-- Right Pane: Content Area -->
+            <div id="right-pane" class="right-pane">
+                <!-- Initial view / New question form -->
+            </div>
+        </div>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- STATE MANAGEMENT ---
+            let questions = JSON.parse(localStorage.getItem('questions')) || [];
+            let selectedQuestionId = null;
+
+            // --- DOM ELEMENTS ---
+            const leftPane = document.getElementById('left-pane');
+            const rightPane = document.getElementById('right-pane');
+            const questionsList = document.getElementById('questions-list');
+            const newQuestionBtn = document.getElementById('new-question-btn');
+            const searchInput = document.getElementById('search-input');
+
+            // --- FUNCTIONS ---
+
+            /**
+             * Saves the current questions array to local storage.
+             */
+            const saveQuestions = () => {
+                localStorage.setItem('questions', JSON.stringify(questions));
+            };
+
+            /**
+             * Renders the list of questions in the left pane.
+             */
+            const renderQuestionsList = (filteredQuestions = questions) => {
+                questionsList.innerHTML = '';
+                if (filteredQuestions.length === 0) {
+                    questionsList.innerHTML = `<p class="text-gray-500">No questions yet. Ask one!</p>`;
+                    return;
+                }
+                filteredQuestions.forEach(q => {
+                    const questionCard = document.createElement('div');
+                    questionCard.className = `question-card ${q.id === selectedQuestionId ? 'active' : ''}`;
+                    questionCard.dataset.id = q.id;
+                    questionCard.innerHTML = `
+                        <h3 class="font-bold text-lg">${q.title}</h3>
+                        <p class="text-gray-600 text-sm">${q.question.substring(0, 50)}...</p>
+                    `;
+                    questionCard.addEventListener('click', () => {
+                        selectedQuestionId = q.id;
+                        renderRightPane();
+                        renderQuestionsList(); // Re-render to update active state
+                    });
+                    questionsList.appendChild(questionCard);
+                });
+            };
+
+            /**
+             * Renders the content of the right pane based on the selected question.
+             */
+            const renderRightPane = () => {
+                rightPane.innerHTML = ''; // Clear the pane first
+
+                if (selectedQuestionId === null) {
+                    // Display the "New Question" form by default
+                    renderNewQuestionForm();
+                } else {
+                    // Display the selected question details and response form
+                    const question = questions.find(q => q.id === selectedQuestionId);
+                    if (question) {
+                        renderQuestionDetailView(question);
+                    } else {
+                        // If somehow the selected question is not found, reset
+                        selectedQuestionId = null;
+                        renderNewQuestionForm();
+                    }
+                }
+            };
+
+            /**
+             * Renders the form for submitting a new question.
+             */
+            const renderNewQuestionForm = () => {
+                selectedQuestionId = null; // Ensure no question is selected
+                rightPane.innerHTML = `
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h2 class="text-2xl font-bold mb-4">Welcome to Discussion Portal!</h2>
+                        <p class="text-gray-600 mb-6">Enter a subject and question to get started.</p>
+                        <form id="question-form">
+                            <div class="mb-4">
+                                <label for="title" class="block text-gray-700 font-bold mb-2">Subject</label>
+                                <input type="text" id="title" name="title" class="w-full p-2 border border-gray-300 rounded-lg" required>
+                            </div>
+                            <div class="mb-4">
+                                <label for="question" class="block text-gray-700 font-bold mb-2">Question</label>
+                                <textarea id="question" name="question" rows="4" class="w-full p-2 border border-gray-300 rounded-lg" required></textarea>
+                            </div>
+                            <button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300">Submit</button>
+                        </form>
+                    </div>
+                `;
+                // Add event listener to the newly created form
+                document.getElementById('question-form').addEventListener('submit', handleNewQuestionSubmit);
+                renderQuestionsList();
+            };
+
+            /**
+             * Renders the detailed view for a selected question.
+             * @param {object} question - The question object to display.
+             */
+            const renderQuestionDetailView = (question) => {
+                const responsesHTML = question.responses.map(res => `
+                    <div class="response-card">
+                        <h4 class="font-bold text-md">${res.name}</h4>
+                        <p class="text-gray-700">${res.comment}</p>
+                    </div>
+                `).join('');
+
+                rightPane.innerHTML = `
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <!-- Question Section -->
+                        <div class="mb-6">
+                            <h2 class="text-xl font-bold mb-2">Question</h2>
+                            <div class="bg-gray-100 p-4 rounded-lg">
+                                <h3 class="font-bold text-2xl mb-2">${question.title}</h3>
+                                <p>${question.question}</p>
+                            </div>
+                             <button data-id="${question.id}" class="resolve-btn mt-4 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300">Resolve</button>
+                        </div>
+
+                        <!-- Responses Section -->
+                        <div class="mb-6">
+                            <h2 class="text-xl font-bold mb-4">Responses</h2>
+                            <div id="responses-container">
+                                ${responsesHTML || '<p class="text-gray-500">No responses yet.</p>'}
+                            </div>
+                        </div>
+
+                        <!-- Add Response Form -->
+                        <div>
+                            <h2 class="text-xl font-bold mb-4">Add Response</h2>
+                            <form id="response-form" data-question-id="${question.id}">
+                                <div class="mb-4">
+                                    <label for="name" class="block text-gray-700 font-bold mb-2">Name</label>
+                                    <input type="text" id="name" name="name" class="w-full p-2 border border-gray-300 rounded-lg" required>
+                                </div>
+                                <div class="mb-4">
+                                    <label for="comment" class="block text-gray-700 font-bold mb-2">Comment</label>
+                                    <textarea id="comment" name="comment" rows="3" class="w-full p-2 border border-gray-300 rounded-lg" required></textarea>
+                                </div>
+                                <button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300">Submit</button>
+                            </form>
+                        </div>
+                    </div>
+                `;
+                 // Add event listener for the response form
+                document.getElementById('response-form').addEventListener('submit', handleNewResponseSubmit);
+                // Add event listener for the resolve button
+                document.querySelector('.resolve-btn').addEventListener('click', handleResolveClick);
+            };
+
+
+            // --- EVENT HANDLERS ---
+
+            /**
+             * Handles the submission of the new question form.
+             */
+            const handleNewQuestionSubmit = (e) => {
+                e.preventDefault();
+                const title = e.target.title.value.trim();
+                const questionText = e.target.question.value.trim();
+
+                if (title && questionText) {
+                    const newQuestion = {
+                        id: Date.now(),
+                        title: title,
+                        question: questionText,
+                        responses: []
+                    };
+                    questions.unshift(newQuestion); // Add to the beginning of the array
+                    saveQuestions();
+                    e.target.reset();
+                    renderQuestionsList();
+                    selectedQuestionId = newQuestion.id; // Automatically select the new question
+                    renderRightPane();
+                }
+            };
+
+            /**
+             * Handles the submission of the new response form.
+             */
+            const handleNewResponseSubmit = (e) => {
+                e.preventDefault();
+                const questionId = parseInt(e.target.dataset.questionId);
+                const name = e.target.name.value.trim();
+                const comment = e.target.comment.value.trim();
+
+                if (name && comment) {
+                    const question = questions.find(q => q.id === questionId);
+                    if (question) {
+                        question.responses.push({ name, comment });
+                        saveQuestions();
+                        renderRightPane(); // Re-render the right pane to show the new response
+                    }
+                }
+            };
+
+            /**
+             * Handles the click of the "Resolve" button.
+             */
+            const handleResolveClick = (e) => {
+                const questionId = parseInt(e.target.dataset.id);
+                questions = questions.filter(q => q.id !== questionId);
+                saveQuestions();
+                selectedQuestionId = null;
+                renderQuestionsList();
+                renderRightPane(); // This will render the new question form
+            };
+            
+            /**
+             * Handles the search input to filter questions.
+             */
+            const handleSearch = (e) => {
+                const searchTerm = e.target.value.toLowerCase();
+                const filteredQuestions = questions.filter(q => 
+                    q.title.toLowerCase().includes(searchTerm) || 
+                    q.question.toLowerCase().includes(searchTerm)
+                );
+                renderQuestionsList(filteredQuestions);
+            };
+
+
+            // --- INITIALIZATION ---
+            newQuestionBtn.addEventListener('click', renderNewQuestionForm);
+            searchInput.addEventListener('input', handleSearch);
+
+            // Initial render
+            renderQuestionsList();
+            renderRightPane();
+        });
+    </script>
+</body>
+</html>
